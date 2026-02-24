@@ -40,9 +40,10 @@ class WordEmbeddings:
 
     def __init__(self, filepath):
         self.embeddings = {}
-        self._matrix = None   # built lazily on first get_neighbors call
-        self._words  = None
+        self._neighbor_cache = {}
         self._load(filepath)
+        self._build_matrix() 
+        
 
     def _load(self, filepath):
         print(f"Loading embeddings from '{filepath}' ...")
@@ -71,20 +72,28 @@ class WordEmbeddings:
         return word.lower() in self.embeddings
 
     def get_neighbors(self, word, k=20):
-        """
-        Return the k nearest neighbors of `word` by cosine similarity.
-        Compares the query vector against each word vector individually.
-        Returns list of (neighbor_word, similarity) sorted descending.
-        """
         word = word.lower()
-        if word not in self.embeddings:
-            return []
+        cache_key = (word, k)
+        if cache_key in self._neighbor_cache:
+            return self._neighbor_cache[cache_key]
 
-        query_vec = self.embeddings[word]
-        scores = [
-            (cosine_similarity(query_vec, vec), w)
-            for w, vec in self.embeddings.items()
-            if w != word
-        ]
-        scores.sort(reverse=True)
-        return [(w, sim) for sim, w in scores[:k]]
+        query_vec = self.get_vector(word)
+        # NumPy matrix multiplication is MUCH faster than a Python for-loop
+        # (V, D) dot (D,) -> (V,)
+        similarities = np.dot(self._matrix, query_vec) / (
+            np.linalg.norm(self._matrix, axis=1) * np.linalg.norm(query_vec)
+        )
+        
+        # Get indices of top k+1 (to exclude the word itself)
+        idx = np.argpartition(similarities, -k-1)[-k-1:]
+        idx = idx[np.argsort(similarities[idx])][::-1]
+        
+        result = []
+        for i in idx:
+            w = self._words[i]
+            if w != word:
+                result.append((w, similarities[i]))
+                if len(result) == k: break
+
+        self._neighbor_cache[cache_key] = result
+        return result

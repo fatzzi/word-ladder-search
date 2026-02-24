@@ -1,5 +1,4 @@
 """
-ucs.py — Uniform Cost Search for Word Ladder in Embedding Space.
 
 Strategy : Min-heap ordered by cumulative path cost g(n).
 Cost     : Cosine distance between adjacent word vectors.
@@ -41,7 +40,7 @@ def ucs(embeddings, start, goal, k=20, **kwargs):
         return SearchResult([start], 0, time.time() - t0, True)
     
     # Min-heap priority queue: (cumulative_cost, current_word, path).
-    frontier = [(0.0, start, [start])]
+    frontier = [(0.0, 0, start, [start])]
     counter = 0  # tie-breaker for equal costs
     
     best_cost = {start: 0.0}  # best known cost to reach each word
